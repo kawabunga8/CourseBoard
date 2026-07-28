@@ -5,30 +5,51 @@ export async function fetchCourses(schoolYear: string) {
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Supabase credentials not configured');
-    return [];
+    return getDevFallback(schoolYear);
   }
 
   try {
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/rpc/current_courses?p_school_year=${encodeURIComponent(schoolYear)}`,
+      `${supabaseUrl}/rest/v1/rcs.courses?school_years=cs.{${schoolYear}}&select=id,name,block,grade_years`,
       {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'apikey': supabaseKey,
           'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json',
         },
       }
     );
 
     if (!response.ok) {
-      console.error('Failed to fetch courses:', response.statusText);
-      return [];
+      console.error(`Failed to fetch courses for ${schoolYear}:`, response.status, response.statusText);
+      return getDevFallback(schoolYear);
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log(`Fetched ${data.length} courses for ${schoolYear}`);
+    return data;
   } catch (error) {
     console.error('Error fetching courses:', error);
-    return [];
+    return getDevFallback(schoolYear);
   }
+}
+
+function getDevFallback(schoolYear: string) {
+  if (import.meta.env.DEV) {
+    console.warn(`Using dev fallback courses for ${schoolYear}`);
+    const fallbackCourses: Record<string, any[]> = {
+      '2025-26': [
+        { id: 'cp11-2526', name: 'CP 11', block: '1', grade_years: [11] },
+        { id: 'cp12-2526', name: 'CP 12', block: '2', grade_years: [12] },
+      ],
+      '2026-27': [
+        { id: 'cp10-2627', name: 'CP 10', block: '1', grade_years: [10] },
+        { id: 'cp11-2627', name: 'CP 11', block: '2', grade_years: [11] },
+        { id: 'cp12-2627', name: 'CP 12', block: '3', grade_years: [12] },
+      ],
+      '2027-28': [],
+    };
+    return fallbackCourses[schoolYear] || [];
+  }
+  return [];
 }

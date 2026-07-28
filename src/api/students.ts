@@ -14,7 +14,7 @@ export async function getCourseStudents(courseId: string): Promise<CourseStudent
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Supabase credentials not configured');
-    return [];
+    return getDevStudents(courseId);
   }
 
   try {
@@ -31,11 +31,12 @@ export async function getCourseStudents(courseId: string): Promise<CourseStudent
     );
 
     if (!response.ok) {
-      console.error('Failed to fetch students:', response.statusText);
-      return [];
+      console.error(`Failed to fetch students for course ${courseId}:`, response.status, response.statusText);
+      return getDevStudents(courseId);
     }
 
     const enrollments = await response.json();
+    console.log(`Fetched ${enrollments.length} students for course ${courseId}`);
 
     // Transform enrollments to include student info
     const students: CourseStudent[] = enrollments.map((enrollment: any) => {
@@ -68,6 +69,39 @@ export async function getCourseStudents(courseId: string): Promise<CourseStudent
     return students;
   } catch (error) {
     console.error('Error fetching course students:', error);
-    return [];
+    return getDevStudents(courseId);
   }
+}
+
+function getDevStudents(courseId: string): CourseStudent[] {
+  if (import.meta.env.DEV) {
+    console.warn(`Using dev fallback students for course ${courseId}`);
+    return [
+      {
+        student_id: 's1',
+        student_name: 'Alex Johnson',
+        grade_year: 10,
+        avg_grade: 92,
+        submission_rate: 98,
+        status: 'excellent',
+      },
+      {
+        student_id: 's2',
+        student_name: 'Bailey Smith',
+        grade_year: 10,
+        avg_grade: 85,
+        submission_rate: 90,
+        status: 'on-track',
+      },
+      {
+        student_id: 's3',
+        student_name: 'Casey Williams',
+        grade_year: 10,
+        avg_grade: 72,
+        submission_rate: 75,
+        status: 'at-risk',
+      },
+    ];
+  }
+  return [];
 }

@@ -21,7 +21,7 @@ export async function getCourseAssignments(courseId: string): Promise<CourseAssi
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Supabase credentials not configured');
-    return [];
+    return getDevAssignments(courseId);
   }
 
   try {
@@ -37,11 +37,12 @@ export async function getCourseAssignments(courseId: string): Promise<CourseAssi
     );
 
     if (!response.ok) {
-      console.error('Failed to fetch assignments:', response.statusText);
-      return [];
+      console.error(`Failed to fetch assignments for course ${courseId}:`, response.status, response.statusText);
+      return getDevAssignments(courseId);
     }
 
     const assignments = await response.json();
+    console.log(`Fetched ${assignments.length} assignments for course ${courseId}`);
 
     // Transform to include simulated submission metrics
     return assignments.map((a: any) => ({
@@ -54,8 +55,41 @@ export async function getCourseAssignments(courseId: string): Promise<CourseAssi
     }));
   } catch (error) {
     console.error('Error fetching assignments:', error);
-    return [];
+    return getDevAssignments(courseId);
   }
+}
+
+function getDevAssignments(courseId: string): CourseAssignment[] {
+  if (import.meta.env.DEV) {
+    console.warn(`Using dev fallback assignments for course ${courseId}`);
+    return [
+      {
+        id: 'a1',
+        title: 'Unit 1: Introduction',
+        due_date: '2026-08-15',
+        type: 'Assignment',
+        is_published: true,
+        avg_score: 87,
+      },
+      {
+        id: 'a2',
+        title: 'Unit 2: Core Concepts',
+        due_date: '2026-08-29',
+        type: 'Quiz',
+        is_published: true,
+        avg_score: 82,
+      },
+      {
+        id: 'a3',
+        title: 'Unit 3: Project',
+        due_date: '2026-09-12',
+        type: 'Project',
+        is_published: false,
+        avg_score: 85,
+      },
+    ];
+  }
+  return [];
 }
 
 export async function getCourseMetrics(courseId: string): Promise<CourseMetrics> {
@@ -64,12 +98,7 @@ export async function getCourseMetrics(courseId: string): Promise<CourseMetrics>
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Supabase credentials not configured');
-    return {
-      classAvg: 0,
-      submissionRate: 0,
-      atRiskCount: 0,
-      excellentCount: 0,
-    };
+    return getDevMetrics();
   }
 
   try {
@@ -86,13 +115,8 @@ export async function getCourseMetrics(courseId: string): Promise<CourseMetrics>
     );
 
     if (!response.ok) {
-      console.error('Failed to fetch course metrics:', response.statusText);
-      return {
-        classAvg: 0,
-        submissionRate: 0,
-        atRiskCount: 0,
-        excellentCount: 0,
-      };
+      console.error(`Failed to fetch course metrics for ${courseId}:`, response.status, response.statusText);
+      return getDevMetrics();
     }
 
     const enrollments = await response.json();
@@ -121,11 +145,24 @@ export async function getCourseMetrics(courseId: string): Promise<CourseMetrics>
     };
   } catch (error) {
     console.error('Error fetching course metrics:', error);
+    return getDevMetrics();
+  }
+}
+
+function getDevMetrics(): CourseMetrics {
+  if (import.meta.env.DEV) {
+    console.warn('Using dev fallback metrics');
     return {
-      classAvg: 0,
-      submissionRate: 0,
-      atRiskCount: 0,
-      excellentCount: 0,
+      classAvg: 82,
+      submissionRate: 85,
+      atRiskCount: 2,
+      excellentCount: 5,
     };
   }
+  return {
+    classAvg: 0,
+    submissionRate: 0,
+    atRiskCount: 0,
+    excellentCount: 0,
+  };
 }
