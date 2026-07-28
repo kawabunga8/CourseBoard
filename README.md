@@ -1,32 +1,71 @@
-# React + TypeScript + Vite
+# CourseBoard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A modern course dashboard for instructors and educators. Display student progress, assignment submissions, and course metrics in real-time.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 📊 **Course Metrics** - Class average, submission rates, at-risk student tracking
+- 📝 **Assignment Tracking** - Due dates, submission status, average scores
+- 👥 **Student Progress** - Per-student grades, submission rates, performance status
+- 🎯 **Multi-Course Support** - Switch between courses via dropdown
+- 📱 **Responsive Design** - Works on desktop and mobile
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend:** React 19, TypeScript 5.9, Vite 7
+- **Styling:** CSS 3 (dark theme)
+- **Linting:** ESLint
 
-## Expanding the Oxlint configuration
+## Commands
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm run dev              # Dev server at localhost:5173
+npm run build            # Type-check + Vite bundle
+npm run lint             # ESLint
+npm run preview          # Preview production build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Architecture
+
+### Components
+
+- **Dashboard** - Main container with tab navigation (Overview, Assignments, Students)
+- **Metrics Panel** - Displays class-level statistics
+- **Assignments Table** - Shows assignment submissions and scores
+- **Students Table** - Displays student grades and progress status
+
+### Data Flow
+
+Currently uses mock data. In production:
+- Fetch courses from `/api/courses`
+- Load assignments from `/api/courses/[id]/assignments`
+- Get student data from `/api/courses/[id]/students`
+
+### Integration
+
+Ready to integrate with:
+- **rcs-report-card-tool** API (course + student data)
+- **student-hub** (authentication + enrollment)
+- Supabase (database)
+
+## Deployment
+
+Deploy to Vercel with one command:
+
+```bash
+npm run build && vercel
+```
+
+Environment variables (optional):
+- `VITE_REPORT_CARD_API` - API endpoint for course data
+- `VITE_STUDENT_HUB_API` - API endpoint for enrollment data
+
+## Future Enhancements
+
+- [ ] Real API integration with report-card-tool
+- [ ] Export grades to CSV
+- [ ] Student roster management
+- [ ] Bulk messaging
+- [ ] Assignment rubric/feedback
+- [ ] Grade curves and statistics
+- [ ] Late submission tracking
