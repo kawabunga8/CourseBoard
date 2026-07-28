@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './Dashboard.css';
 import { fetchCourses } from './api/courses';
 import { getCourseStudents } from './api/students';
+import { getCourseAssignments, getCourseMetrics, type CourseAssignment } from './api/assignments';
 
 interface Course {
   id: string;
@@ -10,14 +11,6 @@ interface Course {
   grade_years?: number[];
 }
 
-interface Assignment {
-  id: string;
-  title: string;
-  dueDate: Date;
-  submitted: number;
-  total: number;
-  avgScore?: number;
-}
 
 interface StudentProgress {
   name: string;
@@ -43,6 +36,15 @@ export default function Dashboard() {
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [students, setStudents] = useState<StudentProgress[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [assignments, setAssignments] = useState<CourseAssignment[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [courseMetrics, setCourseMetrics] = useState<CourseMetrics>({
+    classAvg: 0,
+    submissionRate: 0,
+    atRiskCount: 0,
+    excellentCount: 0,
+  });
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
 
   // Load courses from Supabase when school year changes
   useEffect(() => {
@@ -66,18 +68,19 @@ export default function Dashboard() {
     loadCourses();
   }, [schoolYear]);
 
-  // Load students for selected course
+  // Load course data (students, assignments, metrics) for selected course
   useEffect(() => {
     if (!selectedCourse) {
       setStudents([]);
+      setAssignments([]);
+      setCourseMetrics({ classAvg: 0, submissionRate: 0, atRiskCount: 0, excellentCount: 0 });
       return;
     }
 
-    const loadStudents = async () => {
+    const loadCourseData = async () => {
+      // Load students
       setLoadingStudents(true);
       const courseStudents = await getCourseStudents(selectedCourse);
-
-      // Transform CourseStudent to StudentProgress
       const studentProgress: StudentProgress[] = courseStudents.map(cs => ({
         name: cs.student_name,
         email: `${cs.student_name.toLowerCase().replace(' ', '.')}@school`,
@@ -85,60 +88,26 @@ export default function Dashboard() {
         submissionRate: cs.submission_rate || 0,
         status: cs.status,
       }));
-
       setStudents(studentProgress);
       setLoadingStudents(false);
-    };
 
-    loadStudents();
-  }, [selectedCourse]);
+      // Load assignments
+      setLoadingAssignments(true);
+      const courseAssignments = await getCourseAssignments(selectedCourse);
+      setAssignments(courseAssignments);
+      setLoadingAssignments(false);
 
-  const [assignments, setAssignments] = useState<Assignment[]>([
-    {
-      id: 'a1',
-      title: 'Unit 1: Variables & Data Types',
-      dueDate: new Date('2026-08-15'),
-      submitted: 28,
-      total: 30,
-      avgScore: 87,
-    },
-    {
-      id: 'a2',
-      title: 'Unit 2: Control Flow',
-      dueDate: new Date('2026-08-29'),
-      submitted: 26,
-      total: 30,
-      avgScore: 82,
-    },
-    {
-      id: 'a3',
-      title: 'Unit 3: Functions & Scope',
-      dueDate: new Date('2026-09-12'),
-      submitted: 24,
-      total: 30,
-      avgScore: 85,
-    },
-  ]);
-
-  const [metrics] = useState<CourseMetrics>({
-    classAvg: 86.8,
-    submissionRate: 88,
-    atRiskCount: 1,
-    excellentCount: 2,
-  });
-
-  const [activeTab, setActiveTab] = useState<'overview' | 'assignments' | 'students'>('overview');
-
-  useEffect(() => {
-    // Simulate loading course data
-    const loadCourseData = async () => {
-      // In production: fetch from /api/courses/[id]/...
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setAssignments(prev => prev.map(a => ({ ...a })));
+      // Load metrics
+      setLoadingMetrics(true);
+      const metrics = await getCourseMetrics(selectedCourse);
+      setCourseMetrics(metrics);
+      setLoadingMetrics(false);
     };
 
     loadCourseData();
   }, [selectedCourse]);
+
+  const [activeTab, setActiveTab] = useState<'overview' | 'assignments' | 'students'>('overview');
 
   const statusDot = (status: string) => {
     const colors: Record<string, string> = {
@@ -159,12 +128,6 @@ export default function Dashboard() {
       />
     );
   };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const isOverdue = (date: Date) => date < new Date();
 
   return (
     <div className="dashboard">
@@ -235,28 +198,40 @@ export default function Dashboard() {
 
       {activeTab === 'overview' && (
         <div className="overview-panel">
-          <div className="metrics-grid">
-            <div className="metric-card">
-              <h3>Class Average</h3>
-              <p className="metric-value">{metrics.classAvg.toFixed(1)}%</p>
-              <span className="metric-badge" style={{ backgroundColor: '#10b98166' }}>Healthy</span>
+          {selectedCourse && !loadingMetrics ? (
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <h3>Class Average</h3>
+                <p className="metric-value">{courseMetrics.classAvg.toFixed(1)}%</p>
+                <span className="metric-badge" style={{ backgroundColor: courseMetrics.classAvg >= 85 ? '#10b98166' : '#f59e0b66' }}>
+                  {courseMetrics.classAvg >= 85 ? 'Healthy' : 'Monitor'}
+                </span>
+              </div>
+              <div className="metric-card">
+                <h3>Submission Rate</h3>
+                <p className="metric-value">{courseMetrics.submissionRate}%</p>
+                <span className="metric-badge" style={{ backgroundColor: courseMetrics.submissionRate >= 85 ? '#10b98166' : '#f59e0b66' }}>
+                  {courseMetrics.submissionRate >= 85 ? 'Good' : 'Low'}
+                </span>
+              </div>
+              <div className="metric-card">
+                <h3>At-Risk Students</h3>
+                <p className="metric-value">{courseMetrics.atRiskCount}</p>
+                <span className="metric-badge" style={{ backgroundColor: courseMetrics.atRiskCount > 0 ? '#f59e0b66' : '#10b98166' }}>
+                  {courseMetrics.atRiskCount > 0 ? 'Monitor' : 'Good'}
+                </span>
+              </div>
+              <div className="metric-card">
+                <h3>Excellent (90%+)</h3>
+                <p className="metric-value">{courseMetrics.excellentCount}</p>
+                <span className="metric-badge" style={{ backgroundColor: '#06b6d466' }}>Excellent</span>
+              </div>
             </div>
-            <div className="metric-card">
-              <h3>Submission Rate</h3>
-              <p className="metric-value">{metrics.submissionRate}%</p>
-              <span className="metric-badge" style={{ backgroundColor: '#10b98166' }}>Good</span>
+          ) : (
+            <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center' }}>
+              {selectedCourse ? 'Loading metrics...' : 'Select a course to view metrics'}
             </div>
-            <div className="metric-card">
-              <h3>At-Risk Students</h3>
-              <p className="metric-value">{metrics.atRiskCount}</p>
-              <span className="metric-badge" style={{ backgroundColor: '#f59e0b66' }}>Monitor</span>
-            </div>
-            <div className="metric-card">
-              <h3>Excellent (90%+)</h3>
-              <p className="metric-value">{metrics.excellentCount}</p>
-              <span className="metric-badge" style={{ backgroundColor: '#06b6d466' }}>Excellent</span>
-            </div>
-          </div>
+          )}
 
           <div className="alerts-section">
             <h2>Alerts & Notices</h2>
@@ -307,46 +282,55 @@ export default function Dashboard() {
 
       {activeTab === 'assignments' && (
         <div className="assignments-panel">
-          <table className="assignments-table">
-            <thead>
-              <tr>
-                <th>Assignment</th>
-                <th>Due Date</th>
-                <th>Submitted</th>
-                <th>Avg Score</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assignments.map(a => (
-                <tr key={a.id} className={isOverdue(a.dueDate) ? 'overdue' : ''}>
-                  <td>{a.title}</td>
-                  <td style={{ color: isOverdue(a.dueDate) ? '#ef4444' : '#e2e8f0' }}>
-                    {formatDate(a.dueDate)}
-                  </td>
-                  <td>
-                    <span className="badge">{a.submitted}/{a.total}</span>
-                  </td>
-                  <td>{a.avgScore ? `${a.avgScore}%` : 'N/A'}</td>
-                  <td>
-                    <span
-                      className="status-badge"
-                      style={{
-                        backgroundColor:
-                          a.submitted === a.total
-                            ? '#10b98166'
-                            : a.submitted >= a.total * 0.8
-                              ? '#10b98166'
-                              : '#f59e0b66',
-                      }}
-                    >
-                      {a.submitted === a.total ? '✓ Complete' : `${Math.round((a.submitted / a.total) * 100)}%`}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {selectedCourse && !loadingAssignments ? (
+            assignments.length > 0 ? (
+              <table className="assignments-table">
+                <thead>
+                  <tr>
+                    <th>Assignment</th>
+                    <th>Due Date</th>
+                    <th>Type</th>
+                    <th>Avg Score</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assignments.map(a => {
+                    const dueDate = new Date(a.due_date);
+                    const isOverdueAssignment = dueDate < new Date();
+                    return (
+                      <tr key={a.id} className={isOverdueAssignment ? 'overdue' : ''}>
+                        <td>{a.title}</td>
+                        <td style={{ color: isOverdueAssignment ? '#ef4444' : '#e2e8f0' }}>
+                          {dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </td>
+                        <td style={{ fontSize: 12, color: '#94a3b8' }}>{a.type}</td>
+                        <td>{a.avg_score ? `${a.avg_score}%` : 'N/A'}</td>
+                        <td>
+                          <span
+                            className="status-badge"
+                            style={{
+                              backgroundColor: a.is_published ? '#10b98166' : '#64748b66',
+                            }}
+                          >
+                            {a.is_published ? '✓ Published' : 'Draft'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center' }}>
+                No assignments for this course
+              </div>
+            )
+          ) : (
+            <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center' }}>
+              {selectedCourse ? 'Loading assignments...' : 'Select a course to view assignments'}
+            </div>
+          )}
         </div>
       )}
 
