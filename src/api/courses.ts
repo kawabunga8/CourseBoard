@@ -1,5 +1,5 @@
 // API helper to fetch courses from report-card-tool Supabase
-const DEV_FALLBACK_COURSES: Record<string, any[]> = {
+const FALLBACK_COURSES: Record<string, any[]> = {
   '2025-26': [
     { id: 'cp11-2526', name: 'CP 11', block: '1', grade_years: [11] },
     { id: 'cp12-2526', name: 'CP 12', block: '2', grade_years: [12] },
@@ -13,23 +13,25 @@ const DEV_FALLBACK_COURSES: Record<string, any[]> = {
 };
 
 export async function fetchCourses(schoolYear: string) {
-  // In development, always use fallback data
-  if (import.meta.env.DEV) {
-    console.log(`[DEV] Using fallback courses for ${schoolYear}`);
-    return DEV_FALLBACK_COURSES[schoolYear] || [];
-  }
-
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+  // In development, always use fallback data
+  if (import.meta.env.DEV) {
+    console.log(`[DEV] Using fallback courses for ${schoolYear}`);
+    return FALLBACK_COURSES[schoolYear] || [];
+  }
+
+  // In production, try Supabase first, fall back to hardcoded data if it fails
   if (!supabaseUrl || !supabaseKey) {
-    console.error('Supabase credentials not configured');
-    return [];
+    console.warn('Supabase credentials not configured, using fallback courses');
+    return FALLBACK_COURSES[schoolYear] || [];
   }
 
   try {
+    // Try fetching with array contains operator
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/rcs.courses?school_years=cs.{${schoolYear}}&select=id,name,block,grade_years`,
+      `${supabaseUrl}/rest/v1/rcs.courses?select=id,name,block,grade_years&order=id`,
       {
         method: 'GET',
         headers: {
@@ -40,15 +42,34 @@ export async function fetchCourses(schoolYear: string) {
     );
 
     if (!response.ok) {
-      console.error(`Failed to fetch courses for ${schoolYear}:`, response.status, response.statusText);
-      return [];
+      console.warn(`Supabase returned ${response.status}, using fallback courses for ${schoolYear}`);
+      return FALLBACK_COURSES[schoolYear] || [];
     }
 
-    const data = await response.json();
-    console.log(`Fetched ${data.length} courses for ${schoolYear}`);
-    return data.length > 0 ? data : [];
+    const allCourses = await response.json();
+
+    if (!Array.isArray(allCourses) || allCourses.length === 0) {
+      console.warn('No courses found in Supabase, using fallback courses');
+      return FALLBACK_COURSES[schoolYear] || [];
+    }
+
+    // Filter by school_years array containing the selected year
+    const filteredCourses = allCourses.filter((course: any) => {
+      return course.school_years &&
+             Array.isArray(course.school_years) &&
+             course.school_years.includes(schoolYear);
+    });
+
+    if (filteredCourses.length > 0) {
+      console.log(`Fetched ${filteredCourses.length} courses from Supabase for ${schoolYear}`);
+      return filteredCourses;
+    } else {
+      console.warn(`No courses found for ${schoolYear} in Supabase, using fallback`);
+      return FALLBACK_COURSES[schoolYear] || [];
+    }
   } catch (error) {
-    console.error('Error fetching courses:', error);
-    return [];
+    console.error('Error fetching courses from Supabase:', error);
+    console.warn(`Using fallback courses for ${schoolYear}`);
+    return FALLBACK_COURSES[schoolYear] || [];
   }
 }
