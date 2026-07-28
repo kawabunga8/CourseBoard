@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './Dashboard.css';
+import { supabase } from './lib/supabase';
 import { fetchCourses, type Course } from './api/courses';
 import { getCourseStudents, type CourseStudent } from './api/students';
 import { getCourseAssignments, type CourseAssignment } from './api/assignments';
@@ -51,7 +52,7 @@ export default function Dashboard() {
       setError('');
       try {
         const [courseStudents, courseAssignments] = await Promise.all([
-          getCourseStudents(selectedCourse),
+          getCourseStudents(selectedCourse, schoolYear),
           getCourseAssignments(selectedCourse),
         ]);
         setStudents(courseStudents);
@@ -66,7 +67,7 @@ export default function Dashboard() {
     };
 
     loadCourseData();
-  }, [selectedCourse]);
+  }, [selectedCourse, schoolYear]);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'assignments' | 'students'>('overview');
 
@@ -127,11 +128,13 @@ export default function Dashboard() {
                 )}
               </select>
               <p className="status-info">
-                {courses.length > 0 ? `${courses.length} courses · ` : ''}
-                Last updated: {new Date().toLocaleTimeString()}
+                {courses.length > 0 ? `${courses.length} courses` : ''}
               </p>
             </>
           )}
+          <button className="signout-btn" onClick={() => supabase.auth.signOut()}>
+            Sign out
+          </button>
         </div>
       </header>
 
@@ -176,7 +179,7 @@ export default function Dashboard() {
               <div className="metric-card">
                 <h3>Past Due</h3>
                 <p className="metric-value">
-                  {assignments.filter(a => new Date(a.due_date) < new Date()).length}
+                  {assignments.filter(a => a.due_date && new Date(a.due_date) < new Date()).length}
                 </p>
               </div>
             </div>
@@ -203,15 +206,17 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {assignments.map(a => {
-                    const dueDate = new Date(a.due_date);
-                    const isOverdueAssignment = dueDate < new Date();
+                    const dueDate = a.due_date ? new Date(a.due_date) : null;
+                    const isOverdueAssignment = dueDate !== null && dueDate < new Date();
                     return (
                       <tr key={a.id} className={isOverdueAssignment ? 'overdue' : ''}>
                         <td>{a.title}</td>
                         <td style={{ color: isOverdueAssignment ? '#ef4444' : '#e2e8f0' }}>
-                          {dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {dueDate
+                            ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            : '—'}
                         </td>
-                        <td style={{ fontSize: 12, color: '#94a3b8' }}>{a.type}</td>
+                        <td style={{ fontSize: 12, color: '#94a3b8' }}>{a.type ?? '—'}</td>
                         <td>
                           <span
                             className="status-badge"
