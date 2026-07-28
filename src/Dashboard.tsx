@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import './Dashboard.css';
+import { fetchCourses } from './api/courses';
 
 interface Course {
   id: string;
   name: string;
-  code: string;
-  semester: string;
+  block?: string;
+  grade_years?: number[];
 }
 
 interface Assignment {
@@ -33,12 +34,35 @@ interface CourseMetrics {
 }
 
 export default function Dashboard() {
-  const [selectedCourse, setSelectedCourse] = useState<string>('CP12');
-  const [courses] = useState<Course[]>([
-    { id: 'CP12', name: 'Computer Programming 12', code: 'CP12', semester: 'S1 2026' },
-    { id: 'CP11', name: 'Computer Programming 11', code: 'CP11', semester: 'S1 2026' },
-    { id: 'CS10', name: 'Computer Science 10', code: 'CS10', semester: 'S1 2026' },
-  ]);
+  const [selectedCourse, setSelectedCourse] = useState<string>('');
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  const schoolYear = '2026-27';
+
+  // Load courses from Supabase on mount
+  useEffect(() => {
+    const loadCourses = async () => {
+      setLoadingCourses(true);
+      const fetchedCourses = await fetchCourses(schoolYear);
+
+      if (Array.isArray(fetchedCourses) && fetchedCourses.length > 0) {
+        setCourses(fetchedCourses);
+        setSelectedCourse(fetchedCourses[0].id);
+      } else {
+        // Fallback to mock data if API fails
+        const mockCourses: Course[] = [
+          { id: '1', name: 'Computer Programming 12', block: 'A' },
+          { id: '2', name: 'Computer Programming 11', block: 'B' },
+          { id: '3', name: 'Computer Science 10', block: 'C' },
+        ];
+        setCourses(mockCourses);
+        setSelectedCourse(mockCourses[0].id);
+      }
+      setLoadingCourses(false);
+    };
+
+    loadCourses();
+  }, []);
 
   const [assignments, setAssignments] = useState<Assignment[]>([
     {
@@ -67,7 +91,7 @@ export default function Dashboard() {
     },
   ]);
 
-  const [students, setStudents] = useState<StudentProgress[]>([
+  const [students] = useState<StudentProgress[]>([
     { name: 'Alice Johnson', email: 'alice@school', avgGrade: 95, submissionRate: 100, status: 'excellent' },
     { name: 'Bob Smith', email: 'bob@school', avgGrade: 88, submissionRate: 93, status: 'on-track' },
     { name: 'Carol Davis', email: 'carol@school', avgGrade: 72, submissionRate: 67, status: 'at-risk' },
@@ -75,7 +99,7 @@ export default function Dashboard() {
     { name: 'Emma Wilson', email: 'emma@school', avgGrade: 78, submissionRate: 80, status: 'on-track' },
   ]);
 
-  const [metrics, setMetrics] = useState<CourseMetrics>({
+  const [metrics] = useState<CourseMetrics>({
     classAvg: 86.8,
     submissionRate: 88,
     atRiskCount: 1,
@@ -126,26 +150,38 @@ export default function Dashboard() {
       <header className="dashboard-header">
         <h1>📚 Course Dashboard</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <select
-            value={selectedCourse}
-            onChange={e => setSelectedCourse(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#1e293b',
-              color: '#e2e8f0',
-              border: '1px solid #334155',
-              borderRadius: 6,
-              fontSize: 14,
-              cursor: 'pointer',
-            }}
-          >
-            {courses.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.code}: {c.name}
-              </option>
-            ))}
-          </select>
-          <p className="status-info">Last updated: {new Date().toLocaleTimeString()}</p>
+          {loadingCourses ? (
+            <p className="status-info">Loading courses...</p>
+          ) : (
+            <>
+              <select
+                value={selectedCourse}
+                onChange={e => setSelectedCourse(e.target.value)}
+                disabled={courses.length === 0}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: '#1e293b',
+                  color: '#e2e8f0',
+                  border: '1px solid #334155',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  cursor: courses.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: courses.length === 0 ? 0.5 : 1,
+                }}
+              >
+                <option value="">Select a course...</option>
+                {courses.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.block ? `(Block ${c.block})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="status-info">
+                {courses.length > 0 ? `${courses.length} courses · ` : ''}
+                Last updated: {new Date().toLocaleTimeString()}
+              </p>
+            </>
+          )}
         </div>
       </header>
 
