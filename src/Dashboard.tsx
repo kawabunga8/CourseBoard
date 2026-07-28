@@ -52,70 +52,9 @@ export default function Dashboard() {
         setCourses(fetchedCourses);
         setSelectedCourse(fetchedCourses[0].id);
       } else {
-        // Fallback to mock data based on school year
-        let mockCourses: Course[] = [];
-
-        if (schoolYear === '2026-27') {
-          // 2026-27: All 16 courses across all blocks
-          mockCourses = [
-            { id: '1', name: 'Computer Programming 11', block: 'A' },
-            { id: '2', name: 'Computer Programming 12', block: 'A' },
-            { id: '3', name: 'Biblical Perspectives 10', block: 'B' },
-            { id: '4', name: 'Biblical Perspectives 10', block: 'C' },
-            { id: '5', name: 'Career Life Education 10', block: 'CLE' },
-            { id: '6', name: 'Band 12', block: 'D' },
-            { id: '7', name: 'Band 11', block: 'D' },
-            { id: '8', name: 'Band 10', block: 'D' },
-            { id: '9', name: 'WL 12', block: 'F' },
-            { id: '10', name: 'WL 11', block: 'F' },
-            { id: '11', name: 'CS10 (Q1/Q2)', block: 'G' },
-            { id: '12', name: 'CS10 (Q3/Q4)', block: 'G' },
-            { id: '13', name: 'Band 9 (Q3/Q4)', block: 'H' },
-            { id: '14', name: 'ICT 9 (Q2)', block: 'H' },
-            { id: '15', name: 'ICT 9 (Q1)', block: 'H' },
-          ];
-        } else if (schoolYear === '2025-26') {
-          // 2025-26: Smaller course offering
-          mockCourses = [
-            { id: '1', name: 'Computer Programming 11', block: 'A' },
-            { id: '2', name: 'Computer Programming 12', block: 'A' },
-            { id: '3', name: 'Biblical Perspectives 10', block: 'B' },
-            { id: '4', name: 'Biblical Perspectives 10', block: 'C' },
-            { id: '5', name: 'Career Life Education 10', block: 'CLE' },
-            { id: '6', name: 'Band 12', block: 'D' },
-            { id: '7', name: 'Band 11', block: 'D' },
-          ];
-        } else if (schoolYear === '2027-28') {
-          // 2027-28: Future year with expanded offerings
-          mockCourses = [
-            { id: '1', name: 'Computer Programming 11', block: 'A' },
-            { id: '2', name: 'Computer Programming 12', block: 'A' },
-            { id: '3', name: 'Introduction to AI', block: 'A' },
-            { id: '4', name: 'Biblical Perspectives 10', block: 'B' },
-            { id: '5', name: 'Biblical Perspectives 11', block: 'B' },
-            { id: '6', name: 'Biblical Perspectives 10', block: 'C' },
-            { id: '7', name: 'Career Life Education 10', block: 'CLE' },
-            { id: '8', name: 'Career Life Education 11', block: 'CLE' },
-            { id: '9', name: 'Band 12', block: 'D' },
-            { id: '10', name: 'Band 11', block: 'D' },
-            { id: '11', name: 'Band 10', block: 'D' },
-            { id: '12', name: 'Orchestra 12', block: 'D' },
-            { id: '13', name: 'WL 12', block: 'F' },
-            { id: '14', name: 'WL 11', block: 'F' },
-            { id: '15', name: 'WL 10', block: 'F' },
-            { id: '16', name: 'CS10 (Q1/Q2)', block: 'G' },
-            { id: '17', name: 'CS10 (Q3/Q4)', block: 'G' },
-            { id: '18', name: 'AP Computer Science', block: 'G' },
-            { id: '19', name: 'Band 9 (Q3/Q4)', block: 'H' },
-            { id: '20', name: 'ICT 9 (Q2)', block: 'H' },
-            { id: '21', name: 'ICT 9 (Q1)', block: 'H' },
-          ];
-        }
-
-        setCourses(mockCourses);
-        if (mockCourses.length > 0) {
-          setSelectedCourse(mockCourses[0].id);
-        }
+        // No courses found in database for this school year
+        setCourses([]);
+        setSelectedCourse('');
       }
       setLoadingCourses(false);
     };
