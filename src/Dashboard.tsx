@@ -162,7 +162,6 @@ export default function Dashboard() {
               <select
                 value={selectedCourse}
                 onChange={e => setSelectedCourse(e.target.value)}
-                disabled={courses.length === 0}
                 style={{
                   padding: '8px 12px',
                   backgroundColor: '#1e293b',
@@ -170,16 +169,21 @@ export default function Dashboard() {
                   border: '1px solid #334155',
                   borderRadius: 6,
                   fontSize: 14,
-                  cursor: courses.length === 0 ? 'not-allowed' : 'pointer',
-                  opacity: courses.length === 0 ? 0.5 : 1,
+                  cursor: 'pointer',
                 }}
               >
-                <option value="">Select a course...</option>
-                {courses.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.block ? `(Block ${c.block})` : ''}
-                  </option>
-                ))}
+                {courses.length === 0 ? (
+                  <option value="">No courses available for this year</option>
+                ) : (
+                  <>
+                    <option value="">Select a course...</option>
+                    {courses.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.block ? `(Block ${c.block})` : ''}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
               <p className="status-info">
                 {courses.length > 0 ? `${courses.length} courses · ` : ''}
