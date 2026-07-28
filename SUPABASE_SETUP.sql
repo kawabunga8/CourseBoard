@@ -29,13 +29,12 @@ SET school_years = ARRAY['2026-27']
 WHERE TRUE;
 
 -- ========================================
--- STEP 4: 2027-28 ROSTER (21 courses - expanded)
+-- STEP 4: 2027-28 ROSTER (0 courses initially)
 -- ========================================
--- Expand for 2027-28 if needed (optional additions like AI, AP CS, Orchestra, etc.)
--- For now, this would also get all current 16 courses
-UPDATE rcs.courses
-SET school_years = ARRAY['2027-28']
-WHERE TRUE;
+-- Leave 2027-28 empty for now. When ready to expand offerings for 2027-28,
+-- add specific courses or add new courses with school_years = ARRAY['2027-28']
+-- For example: INSERT INTO rcs.courses VALUES (..., school_years := ARRAY['2027-28'])
+-- Or: UPDATE rcs.courses SET school_years = ARRAY['2027-28'] WHERE name IN (...);
 
 -- ========================================
 -- VERIFY: Check course distribution
