@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import './Dashboard.css';
 import { fetchCourses } from './api/courses';
+import { getCourseStudents } from './api/students';
 
 interface Course {
   id: string;
@@ -40,12 +41,15 @@ export default function Dashboard() {
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
+  const [students, setStudents] = useState<StudentProgress[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
   // Load courses from Supabase when school year changes
   useEffect(() => {
     const loadCourses = async () => {
       setLoadingCourses(true);
       setSelectedCourse('');
+      setStudents([]);
       const fetchedCourses = await fetchCourses(schoolYear);
 
       if (Array.isArray(fetchedCourses) && fetchedCourses.length > 0) {
@@ -61,6 +65,33 @@ export default function Dashboard() {
 
     loadCourses();
   }, [schoolYear]);
+
+  // Load students for selected course
+  useEffect(() => {
+    if (!selectedCourse) {
+      setStudents([]);
+      return;
+    }
+
+    const loadStudents = async () => {
+      setLoadingStudents(true);
+      const courseStudents = await getCourseStudents(selectedCourse);
+
+      // Transform CourseStudent to StudentProgress
+      const studentProgress: StudentProgress[] = courseStudents.map(cs => ({
+        name: cs.student_name,
+        email: `${cs.student_name.toLowerCase().replace(' ', '.')}@school`,
+        avgGrade: cs.avg_grade || 0,
+        submissionRate: cs.submission_rate || 0,
+        status: cs.status,
+      }));
+
+      setStudents(studentProgress);
+      setLoadingStudents(false);
+    };
+
+    loadStudents();
+  }, [selectedCourse]);
 
   const [assignments, setAssignments] = useState<Assignment[]>([
     {
@@ -87,14 +118,6 @@ export default function Dashboard() {
       total: 30,
       avgScore: 85,
     },
-  ]);
-
-  const [students] = useState<StudentProgress[]>([
-    { name: 'Alice Johnson', email: 'alice@school', avgGrade: 95, submissionRate: 100, status: 'excellent' },
-    { name: 'Bob Smith', email: 'bob@school', avgGrade: 88, submissionRate: 93, status: 'on-track' },
-    { name: 'Carol Davis', email: 'carol@school', avgGrade: 72, submissionRate: 67, status: 'at-risk' },
-    { name: 'David Lee', email: 'david@school', avgGrade: 91, submissionRate: 100, status: 'excellent' },
-    { name: 'Emma Wilson', email: 'emma@school', avgGrade: 78, submissionRate: 80, status: 'on-track' },
   ]);
 
   const [metrics] = useState<CourseMetrics>({
@@ -237,19 +260,47 @@ export default function Dashboard() {
 
           <div className="alerts-section">
             <h2>Alerts & Notices</h2>
-            <div className="alert">
-              <span>⚠️</span>
-              <div>
-                <strong>Carol Davis</strong> - Falling behind on submissions (67% rate)
-              </div>
-              <button className="alert-action">Contact</button>
-            </div>
-            <div className="alert">
-              <span>✅</span>
-              <div>
-                <strong>Unit 3 Assignment</strong> - 80% submitted, avg score 85%
-              </div>
-            </div>
+            {selectedCourse ? (
+              loadingStudents ? (
+                <p style={{ color: '#94a3b8', fontSize: 12 }}>Loading student data...</p>
+              ) : students.length === 0 ? (
+                <p style={{ color: '#94a3b8', fontSize: 12 }}>No students enrolled in this course</p>
+              ) : (
+                <>
+                  {/* At-risk students */}
+                  {students
+                    .filter(s => s.status === 'at-risk')
+                    .map((student, idx) => (
+                      <div key={idx} className="alert">
+                        <span>⚠️</span>
+                        <div>
+                          <strong>{student.name}</strong> - At risk ({student.avgGrade}% avg, {student.submissionRate}% submissions)
+                        </div>
+                        <button className="alert-action">Contact</button>
+                      </div>
+                    ))}
+
+                  {/* Excellent performers */}
+                  {students
+                    .filter(s => s.status === 'excellent')
+                    .slice(0, 2)
+                    .map((student, idx) => (
+                      <div key={idx} className="alert">
+                        <span>⭐</span>
+                        <div>
+                          <strong>{student.name}</strong> - Excellent performance ({student.avgGrade}% avg)
+                        </div>
+                      </div>
+                    ))}
+
+                  {students.length === 0 && (
+                    <p style={{ color: '#94a3b8', fontSize: 12 }}>No alerts for this course</p>
+                  )}
+                </>
+              )
+            ) : (
+              <p style={{ color: '#94a3b8', fontSize: 12 }}>Select a course to view student alerts</p>
+            )}
           </div>
         </div>
       )}
