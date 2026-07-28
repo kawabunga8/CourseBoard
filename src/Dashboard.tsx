@@ -1,31 +1,8 @@
 import { useState, useEffect } from 'react';
 import './Dashboard.css';
-import { fetchCourses } from './api/courses';
-import { getCourseStudents } from './api/students';
-import { getCourseAssignments, getCourseMetrics, type CourseAssignment } from './api/assignments';
-
-interface Course {
-  id: string;
-  name: string;
-  block?: string;
-  grade_years?: number[];
-}
-
-
-interface StudentProgress {
-  name: string;
-  email: string;
-  avgGrade: number;
-  submissionRate: number;
-  status: 'on-track' | 'at-risk' | 'excellent';
-}
-
-interface CourseMetrics {
-  classAvg: number;
-  submissionRate: number;
-  atRiskCount: number;
-  excellentCount: number;
-}
+import { fetchCourses, type Course } from './api/courses';
+import { getCourseStudents, type CourseStudent } from './api/students';
+import { getCourseAssignments, type CourseAssignment } from './api/assignments';
 
 const SCHOOL_YEARS = ['2025-26', '2026-27', '2027-28'];
 
@@ -34,33 +11,26 @@ export default function Dashboard() {
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
-  const [students, setStudents] = useState<StudentProgress[]>([]);
+  const [students, setStudents] = useState<CourseStudent[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [assignments, setAssignments] = useState<CourseAssignment[]>([]);
   const [loadingAssignments, setLoadingAssignments] = useState(false);
-  const [courseMetrics, setCourseMetrics] = useState<CourseMetrics>({
-    classAvg: 0,
-    submissionRate: 0,
-    atRiskCount: 0,
-    excellentCount: 0,
-  });
-  const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [error, setError] = useState<string>('');
 
-  // Load courses from Supabase when school year changes
   useEffect(() => {
     const loadCourses = async () => {
       setLoadingCourses(true);
+      setError('');
       setSelectedCourse('');
       setStudents([]);
-      const fetchedCourses = await fetchCourses(schoolYear);
-
-      if (Array.isArray(fetchedCourses) && fetchedCourses.length > 0) {
-        setCourses(fetchedCourses);
-        setSelectedCourse(fetchedCourses[0].id);
-      } else {
-        // No courses found in database for this school year
+      setAssignments([]);
+      try {
+        const fetched = await fetchCourses(schoolYear);
+        setCourses(fetched);
+        setSelectedCourse(fetched[0]?.id ?? '');
+      } catch (e) {
         setCourses([]);
-        setSelectedCourse('');
+        setError(e instanceof Error ? e.message : String(e));
       }
       setLoadingCourses(false);
     };
@@ -68,66 +38,37 @@ export default function Dashboard() {
     loadCourses();
   }, [schoolYear]);
 
-  // Load course data (students, assignments, metrics) for selected course
   useEffect(() => {
     if (!selectedCourse) {
       setStudents([]);
       setAssignments([]);
-      setCourseMetrics({ classAvg: 0, submissionRate: 0, atRiskCount: 0, excellentCount: 0 });
       return;
     }
 
     const loadCourseData = async () => {
-      // Load students
       setLoadingStudents(true);
-      const courseStudents = await getCourseStudents(selectedCourse);
-      const studentProgress: StudentProgress[] = courseStudents.map(cs => ({
-        name: cs.student_name,
-        email: `${cs.student_name.toLowerCase().replace(' ', '.')}@school`,
-        avgGrade: cs.avg_grade || 0,
-        submissionRate: cs.submission_rate || 0,
-        status: cs.status,
-      }));
-      setStudents(studentProgress);
-      setLoadingStudents(false);
-
-      // Load assignments
       setLoadingAssignments(true);
-      const courseAssignments = await getCourseAssignments(selectedCourse);
-      setAssignments(courseAssignments);
+      setError('');
+      try {
+        const [courseStudents, courseAssignments] = await Promise.all([
+          getCourseStudents(selectedCourse),
+          getCourseAssignments(selectedCourse),
+        ]);
+        setStudents(courseStudents);
+        setAssignments(courseAssignments);
+      } catch (e) {
+        setStudents([]);
+        setAssignments([]);
+        setError(e instanceof Error ? e.message : String(e));
+      }
+      setLoadingStudents(false);
       setLoadingAssignments(false);
-
-      // Load metrics
-      setLoadingMetrics(true);
-      const metrics = await getCourseMetrics(selectedCourse);
-      setCourseMetrics(metrics);
-      setLoadingMetrics(false);
     };
 
     loadCourseData();
   }, [selectedCourse]);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'assignments' | 'students'>('overview');
-
-  const statusDot = (status: string) => {
-    const colors: Record<string, string> = {
-      'on-track': '#10b981',
-      'excellent': '#06b6d4',
-      'at-risk': '#ef4444',
-    };
-    return (
-      <span
-        style={{
-          display: 'inline-block',
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          backgroundColor: colors[status] || '#94a3b8',
-          marginRight: 8,
-        }}
-      />
-    );
-  };
 
   return (
     <div className="dashboard">
@@ -194,6 +135,22 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {error && (
+        <div
+          style={{
+            margin: '12px 0',
+            padding: '12px 16px',
+            backgroundColor: '#7f1d1d',
+            border: '1px solid #ef4444',
+            borderRadius: 6,
+            color: '#fecaca',
+            fontSize: 13,
+          }}
+        >
+          <strong>Database error:</strong> {error}
+        </div>
+      )}
+
       <div className="tab-switcher">
         <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>Overview</button>
         <button className={`tab-btn ${activeTab === 'assignments' ? 'active' : ''}`} onClick={() => setActiveTab('assignments')}>Assignments</button>
@@ -202,85 +159,32 @@ export default function Dashboard() {
 
       {activeTab === 'overview' && (
         <div className="overview-panel">
-          {selectedCourse && !loadingMetrics ? (
+          {selectedCourse && !loadingStudents && !loadingAssignments ? (
             <div className="metrics-grid">
               <div className="metric-card">
-                <h3>Class Average</h3>
-                <p className="metric-value">{courseMetrics.classAvg.toFixed(1)}%</p>
-                <span className="metric-badge" style={{ backgroundColor: courseMetrics.classAvg >= 85 ? '#10b98166' : '#f59e0b66' }}>
-                  {courseMetrics.classAvg >= 85 ? 'Healthy' : 'Monitor'}
-                </span>
+                <h3>Students Enrolled</h3>
+                <p className="metric-value">{students.length}</p>
               </div>
               <div className="metric-card">
-                <h3>Submission Rate</h3>
-                <p className="metric-value">{courseMetrics.submissionRate}%</p>
-                <span className="metric-badge" style={{ backgroundColor: courseMetrics.submissionRate >= 85 ? '#10b98166' : '#f59e0b66' }}>
-                  {courseMetrics.submissionRate >= 85 ? 'Good' : 'Low'}
-                </span>
+                <h3>Assignments</h3>
+                <p className="metric-value">{assignments.length}</p>
               </div>
               <div className="metric-card">
-                <h3>At-Risk Students</h3>
-                <p className="metric-value">{courseMetrics.atRiskCount}</p>
-                <span className="metric-badge" style={{ backgroundColor: courseMetrics.atRiskCount > 0 ? '#f59e0b66' : '#10b98166' }}>
-                  {courseMetrics.atRiskCount > 0 ? 'Monitor' : 'Good'}
-                </span>
+                <h3>Published</h3>
+                <p className="metric-value">{assignments.filter(a => a.is_published).length}</p>
               </div>
               <div className="metric-card">
-                <h3>Excellent (90%+)</h3>
-                <p className="metric-value">{courseMetrics.excellentCount}</p>
-                <span className="metric-badge" style={{ backgroundColor: '#06b6d466' }}>Excellent</span>
+                <h3>Past Due</h3>
+                <p className="metric-value">
+                  {assignments.filter(a => new Date(a.due_date) < new Date()).length}
+                </p>
               </div>
             </div>
           ) : (
             <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center' }}>
-              {selectedCourse ? 'Loading metrics...' : 'Select a course to view metrics'}
+              {selectedCourse ? 'Loading…' : 'Select a course to view metrics'}
             </div>
           )}
-
-          <div className="alerts-section">
-            <h2>Alerts & Notices</h2>
-            {selectedCourse ? (
-              loadingStudents ? (
-                <p style={{ color: '#94a3b8', fontSize: 12 }}>Loading student data...</p>
-              ) : students.length === 0 ? (
-                <p style={{ color: '#94a3b8', fontSize: 12 }}>No students enrolled in this course</p>
-              ) : (
-                <>
-                  {/* At-risk students */}
-                  {students
-                    .filter(s => s.status === 'at-risk')
-                    .map((student, idx) => (
-                      <div key={idx} className="alert">
-                        <span>⚠️</span>
-                        <div>
-                          <strong>{student.name}</strong> - At risk ({student.avgGrade}% avg, {student.submissionRate}% submissions)
-                        </div>
-                        <button className="alert-action">Contact</button>
-                      </div>
-                    ))}
-
-                  {/* Excellent performers */}
-                  {students
-                    .filter(s => s.status === 'excellent')
-                    .slice(0, 2)
-                    .map((student, idx) => (
-                      <div key={idx} className="alert">
-                        <span>⭐</span>
-                        <div>
-                          <strong>{student.name}</strong> - Excellent performance ({student.avgGrade}% avg)
-                        </div>
-                      </div>
-                    ))}
-
-                  {students.length === 0 && (
-                    <p style={{ color: '#94a3b8', fontSize: 12 }}>No alerts for this course</p>
-                  )}
-                </>
-              )
-            ) : (
-              <p style={{ color: '#94a3b8', fontSize: 12 }}>Select a course to view student alerts</p>
-            )}
-          </div>
         </div>
       )}
 
@@ -294,7 +198,6 @@ export default function Dashboard() {
                     <th>Assignment</th>
                     <th>Due Date</th>
                     <th>Type</th>
-                    <th>Avg Score</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -309,7 +212,6 @@ export default function Dashboard() {
                           {dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </td>
                         <td style={{ fontSize: 12, color: '#94a3b8' }}>{a.type}</td>
-                        <td>{a.avg_score ? `${a.avg_score}%` : 'N/A'}</td>
                         <td>
                           <span
                             className="status-badge"
@@ -340,46 +242,34 @@ export default function Dashboard() {
 
       {activeTab === 'students' && (
         <div className="students-panel">
-          <table className="students-table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Email</th>
-                <th>Avg Grade</th>
-                <th>Submission Rate</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((s, i) => (
-                <tr key={i}>
-                  <td>{s.name}</td>
-                  <td style={{ fontSize: 12, color: '#94a3b8' }}>{s.email}</td>
-                  <td style={{ fontWeight: 600 }}>{s.avgGrade}%</td>
-                  <td>{s.submissionRate}%</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      {statusDot(s.status)}
-                      <span
-                        style={{
-                          fontSize: 12,
-                          textTransform: 'capitalize',
-                          color:
-                            s.status === 'excellent'
-                              ? '#06b6d4'
-                              : s.status === 'at-risk'
-                                ? '#ef4444'
-                                : '#10b981',
-                        }}
-                      >
-                        {s.status.replace('-', ' ')}
-                      </span>
-                    </div>
-                  </td>
+          {!selectedCourse ? (
+            <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center' }}>
+              Select a course to view students
+            </div>
+          ) : loadingStudents ? (
+            <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center' }}>Loading students…</div>
+          ) : students.length === 0 ? (
+            <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center' }}>
+              No students enrolled in this course
+            </div>
+          ) : (
+            <table className="students-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Grade</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {students.map(s => (
+                  <tr key={s.student_id}>
+                    <td>{s.student_name}</td>
+                    <td>{s.grade_year}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
