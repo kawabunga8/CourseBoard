@@ -30,16 +30,26 @@ export function compareBlocks(a?: string | null, b?: string | null): number {
 }
 
 export async function fetchCourses(schoolYear: string): Promise<Course[]> {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('id,name,block,grade_years,school_years')
-    .contains('school_years', [schoolYear]);
+  const [coursesResult, blocksResult] = await Promise.all([
+    supabase
+      .from('courses')
+      .select('id,name,block,grade_years,school_years')
+      .contains('school_years', [schoolYear]),
+    supabase.from('course_blocks').select('course_id,block').eq('school_year', schoolYear),
+  ]);
 
-  if (error) {
-    throw new Error(`Failed to load courses for ${schoolYear}: ${error.message}`);
+  if (coursesResult.error) {
+    throw new Error(`Failed to load courses for ${schoolYear}: ${coursesResult.error.message}`);
+  }
+  if (blocksResult.error) {
+    throw new Error(`Failed to load course blocks for ${schoolYear}: ${blocksResult.error.message}`);
   }
 
-  return (data ?? []).sort(
-    (x, y) => compareBlocks(x.block, y.block) || x.name.localeCompare(y.name)
-  );
+  // A course's block depends on the school year, so prefer the per-year value
+  // and fall back to the course row only if this year has no entry yet.
+  const blockForYear = new Map((blocksResult.data ?? []).map(b => [b.course_id, b.block]));
+
+  return (coursesResult.data ?? [])
+    .map(c => ({ ...c, block: blockForYear.get(c.id) ?? c.block }))
+    .sort((x, y) => compareBlocks(x.block, y.block) || x.name.localeCompare(y.name));
 }
