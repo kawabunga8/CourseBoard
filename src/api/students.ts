@@ -9,12 +9,18 @@ export interface CourseStudent {
 }
 
 export async function getCourseStudents(courseId: string): Promise<CourseStudent[]> {
+  // In development, always use fallback data
+  if (import.meta.env.DEV) {
+    console.log(`[DEV] Using fallback students for course ${courseId}`);
+    return getDevStudents(courseId);
+  }
+
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Supabase credentials not configured');
-    return getDevStudents(courseId);
+    return [];
   }
 
   try {

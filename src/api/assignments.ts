@@ -16,12 +16,18 @@ export interface CourseMetrics {
 }
 
 export async function getCourseAssignments(courseId: string): Promise<CourseAssignment[]> {
+  // In development, always use fallback data
+  if (import.meta.env.DEV) {
+    console.log(`[DEV] Using fallback assignments for course ${courseId}`);
+    return getDevAssignments(courseId);
+  }
+
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Supabase credentials not configured');
-    return getDevAssignments(courseId);
+    return [];
   }
 
   try {
@@ -93,12 +99,23 @@ function getDevAssignments(courseId: string): CourseAssignment[] {
 }
 
 export async function getCourseMetrics(courseId: string): Promise<CourseMetrics> {
+  // In development, always use fallback data
+  if (import.meta.env.DEV) {
+    console.log(`[DEV] Using fallback metrics for course ${courseId}`);
+    return getDevMetrics();
+  }
+
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Supabase credentials not configured');
-    return getDevMetrics();
+    return {
+      classAvg: 0,
+      submissionRate: 0,
+      atRiskCount: 0,
+      excellentCount: 0,
+    };
   }
 
   try {
