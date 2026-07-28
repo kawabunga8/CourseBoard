@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './Dashboard.css';
 import { supabase } from './lib/supabase';
-import { fetchCourses, type Course } from './api/courses';
+import { fetchCourses, compareBlocks, type Course } from './api/courses';
 import { getCourseStudents, type CourseStudent } from './api/students';
 import { getCourseAssignments, type CourseAssignment } from './api/assignments';
 
@@ -71,6 +71,19 @@ export default function Dashboard() {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'assignments' | 'students'>('overview');
 
+  // Courses arrive already sorted by block; group them so the dropdown shows
+  // one heading per timetable block for the selected year.
+  const coursesByBlock = useMemo(() => {
+    const groups = new Map<string, Course[]>();
+    for (const course of courses) {
+      const block = (course.block ?? '').trim().toUpperCase();
+      const existing = groups.get(block);
+      if (existing) existing.push(course);
+      else groups.set(block, [course]);
+    }
+    return [...groups.entries()].sort(([a], [b]) => compareBlocks(a, b));
+  }, [courses]);
+
   return (
     <div className="dashboard">
       <header className="dashboard-header">
@@ -119,10 +132,14 @@ export default function Dashboard() {
                 ) : (
                   <>
                     <option value="">Select a course...</option>
-                    {courses.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.block ? `(Block ${c.block})` : ''}
-                      </option>
+                    {coursesByBlock.map(([block, blockCourses]) => (
+                      <optgroup key={block} label={block === '' ? 'No block' : `Block ${block}`}>
+                        {blockCourses.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </>
                 )}
