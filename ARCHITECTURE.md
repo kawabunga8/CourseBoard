@@ -339,11 +339,31 @@ reference individual courses, and there is still exactly one source of truth.
 |---|---|---|
 | 1 | ~~Add `teaching_group_id` to `courses`; create groups~~ **Done** — 21 groups, all 29 courses assigned | — |
 | 2 | Repoint `student-hub/StudentsClient.tsx:141` to `courses` | Write access to student-hub |
-| 3 | Migrate 181 unmigrated `enrollments.class_id` → `course_id` | Step 1 (needs the grouping) |
+| 3 | **Delete** 181 legacy `class_id` enrollments — they are duplicates, not gaps (see below) | Confirmation |
 | 4 | Repoint `day_plan_blocks`, `toc_block_plans`, `class_toc_templates` to groups | Steps 1–3 |
 | 5 | Drop `day_plan_blocks.class_name` (denormalised copy of the name) | Step 4 |
 | 6 | Drop `public.classes` | Steps 2–5 |
 | 7 | Add FKs from every course reference to `public.courses` | Step 6 |
+
+### The 181 legacy enrollments are duplicates, not gaps
+
+The obvious reading of "283 of 464 migrated" is that 181 rows still need
+moving. They do not. Comparing (student, block) pairs across both sets:
+
+| | pairs |
+|---|---|
+| Legacy (`class_id`) | 181 |
+| Migrated (`course_id`) | 185 |
+| Present in both | **181** |
+| Legacy only | **0** |
+
+Every legacy enrollment is already represented by a `course_id` row for the
+same student in the same block. Migrating them would not fill a gap — it would
+**double every roster**. The correct action is to delete them.
+
+This matters beyond tidiness: any count over `public.enrollments` that does not
+filter on `course_id is not null` is currently inflated. The four extra migrated
+pairs are enrollments added after the migration ran.
 
 ---
 
