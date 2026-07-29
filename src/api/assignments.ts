@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { resolveRcsCourseId } from './courses';
 
 export interface CourseAssignment {
   id: string;
@@ -8,11 +9,15 @@ export interface CourseAssignment {
   is_published: boolean;
 }
 
-export async function getCourseAssignments(courseId: string): Promise<CourseAssignment[]> {
+/** Takes a Student Hub course id; assignments still live against rcs.courses. */
+export async function getCourseAssignments(hubCourseId: string): Promise<CourseAssignment[]> {
+  const link = await resolveRcsCourseId(hubCourseId);
+  if (!link) return [];
+
   const { data, error } = await supabase
     .from('assignments')
     .select('id,title,due_date,type,is_published')
-    .eq('course_id', courseId)
+    .eq('course_id', link.rcsCourseId)
     .order('due_date', { ascending: true, nullsFirst: false });
 
   if (error) {

@@ -1,11 +1,18 @@
 import { supabase } from '../lib/supabase';
 
+/**
+ * Course data comes from Student Hub (public.courses), which is the source of
+ * truth. It holds one row per course per school year, so the block, room and
+ * quarters already vary by year without any side table.
+ */
 export interface Course {
   id: string;
   name: string;
-  block?: string;
-  grade_years?: number[];
-  school_years?: string[];
+  block: string | null;
+  room: string | null;
+  grade_years: number[] | null;
+  school_year: string;
+  sort_order: number | null;
 }
 
 /**
@@ -30,26 +37,40 @@ export function compareBlocks(a?: string | null, b?: string | null): number {
 }
 
 export async function fetchCourses(schoolYear: string): Promise<Course[]> {
-  const [coursesResult, blocksResult] = await Promise.all([
-    supabase
-      .from('courses')
-      .select('id,name,block,grade_years,school_years')
-      .contains('school_years', [schoolYear]),
-    supabase.from('course_blocks').select('course_id,block').eq('school_year', schoolYear),
-  ]);
+  const { data, error } = await supabase
+    .schema('public')
+    .from('courses')
+    .select('id,name,block,room,grade_years,school_year,sort_order')
+    .eq('school_year', schoolYear)
+    .is('superseded_by', null);
 
-  if (coursesResult.error) {
-    throw new Error(`Failed to load courses for ${schoolYear}: ${coursesResult.error.message}`);
-  }
-  if (blocksResult.error) {
-    throw new Error(`Failed to load course blocks for ${schoolYear}: ${blocksResult.error.message}`);
+  if (error) {
+    throw new Error(`Failed to load courses for ${schoolYear}: ${error.message}`);
   }
 
-  // A course's block depends on the school year, so prefer the per-year value
-  // and fall back to the course row only if this year has no entry yet.
-  const blockForYear = new Map((blocksResult.data ?? []).map(b => [b.course_id, b.block]));
+  return (data ?? []).sort(
+    (x, y) => compareBlocks(x.block, y.block) || x.name.localeCompare(y.name)
+  );
+}
 
-  return (coursesResult.data ?? [])
-    .map(c => ({ ...c, block: blockForYear.get(c.id) ?? c.block }))
-    .sort((x, y) => compareBlocks(x.block, y.block) || x.name.localeCompare(y.name));
+/**
+ * Enrollments still hang off rcs.courses, so a Student Hub course has to be
+ * translated before student data can be looked up. Returns null when the
+ * course has no linked rcs row — meaning no enrollment data exists for it.
+ */
+export async function resolveRcsCourseId(
+  hubCourseId: string
+): Promise<{ rcsCourseId: string; schoolYear: string } | null> {
+  const { data, error } = await supabase
+    .from('course_hub_links')
+    .select('rcs_course_id, school_year')
+    .eq('hub_course_id', hubCourseId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to resolve course link: ${error.message}`);
+  }
+  if (!data) return null;
+
+  return { rcsCourseId: data.rcs_course_id, schoolYear: data.school_year };
 }

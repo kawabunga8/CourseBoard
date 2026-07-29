@@ -52,7 +52,7 @@ export default function Dashboard() {
       setError('');
       try {
         const [courseStudents, courseAssignments] = await Promise.all([
-          getCourseStudents(selectedCourse, schoolYear),
+          getCourseStudents(selectedCourse),
           getCourseAssignments(selectedCourse),
         ]);
         setStudents(courseStudents);
