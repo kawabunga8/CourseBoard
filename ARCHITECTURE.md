@@ -19,8 +19,8 @@ Each of these is observed in the live database, not hypothetical.
 | 2 | Quarters have no school year | `public.school_quarters` = 4 rows, ids 1–4, dates hard-coded to 2025-26 | Next year overwrites this year's dates. Quarter history is lost permanently |
 | 3 | Student identity is year-scoped | `public.students.school_year` | A returning student becomes a second row. No way to follow a student across years |
 | 4 | ~~Two competing course tables~~ **Resolved** | Student Hub (`public.courses`) is now the source of truth for all course data; `rcs.course_hub_links` maps it to enrollments | — |
-| 5 | Two competing student tables | `public.students` (145) and `rcs.students` (5) | Enrollments resolve 185/186 to `public.students`. Querying the wrong one silently returns almost nothing |
-| 6 | Missing referential integrity | No FK on `rcs.enrollments.student_id` | 1 of 186 enrollments already points at a non-existent student. Nothing prevents more |
+| 5 | Two competing student tables | `public.students` (145) and `rcs.students` (5) | Querying the wrong one silently returns almost nothing. `rcs.students` is test data — numbers 10001–10004 plus 999999, created Mar 2026; 3 of 5 duplicate a real `public.students` person under a different UUID |
+| 6 | Missing referential integrity | No FK on `rcs.enrollments.student_id` | The 1 orphaned enrollment was a test-data row (removed); nothing prevents more without the FK |
 | 7 | Flat authorisation | Every `rcs.*` policy is `ALL` to `authenticated` using `true` | Any signed-in account reads every student in every year. No per-teacher scoping, no read-only past |
 | 8 | Free-text years | `'2025-26'` as a string in courses, enrollments, students, course_blocks | A typo creates a silent phantom year. No canonical list to drive the UI |
 | 9 | No stable course identifier | `slug` NULL on all 25 `rcs.courses`; `superseded_by` NULL on all 33 `public.courses` | A course is identifiable only by name — and names drift ("Computer Studies 10" → "Computer Studies 10 Q1/Q2" → "CS10 (Q1/Q2)"). After a gap year, nothing reconnects the course to its own history |
