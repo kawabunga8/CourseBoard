@@ -23,6 +23,8 @@ Each of these is observed in the live database, not hypothetical.
 | 6 | Missing referential integrity | No FK on `rcs.enrollments.student_id` | 1 of 186 enrollments already points at a non-existent student. Nothing prevents more |
 | 7 | Flat authorisation | Every `rcs.*` policy is `ALL` to `authenticated` using `true` | Any signed-in account reads every student in every year. No per-teacher scoping, no read-only past |
 | 8 | Free-text years | `'2025-26'` as a string in courses, enrollments, students, course_blocks | A typo creates a silent phantom year. No canonical list to drive the UI |
+| 9 | No stable course identifier | `slug` NULL on all 25 `rcs.courses`; `superseded_by` NULL on all 33 `public.courses` | A course is identifiable only by name — and names drift ("Computer Studies 10" → "Computer Studies 10 Q1/Q2" → "CS10 (Q1/Q2)"). After a gap year, nothing reconnects the course to its own history |
+| 10 | "Not taught this year" is unrepresentable | 4 courses carry an empty `school_years` array | A course you are simply not teaching this year is indistinguishable from junk data |
 
 ---
 
@@ -56,8 +58,11 @@ erDiagram
     }
     COURSES {
         uuid   id PK
-        text   name "timeless: Band 10"
+        text   code UK "stable: BAND10 — never changes"
+        text   name "display name; may drift"
         int[]  grade_years
+        text   status "active | dormant | retired"
+        uuid   superseded_by FK "lineage when split or merged"
     }
     COURSE_OFFERINGS {
         uuid   id PK
@@ -105,7 +110,69 @@ assignment cannot be attributed to a year when the course spans two.
 
 ---
 
-## 3. Security model
+## 3. Course continuity across gap years
+
+A course may run, pause for one or more years, then return. This is a normal
+part of a teaching assignment, not an exception, and the model must treat it
+as such.
+
+**A gap is the absence of an offering, nothing more.** The course row lives in
+the catalogue permanently and is never deleted or emptied:
+
+```
+courses:            BAND10  "Band 10"        status = active
+course_offerings:   BAND10 × 2025-26  block B
+                    (no row for 2026-27  ← the gap)
+                    BAND10 × 2027-28  block C
+```
+
+Because history hangs off offerings rather than the course, the 2025-26
+enrollments, assignments and marks stay intact and attributable throughout the
+gap. Resuming in 2027-28 is a single insert.
+
+Three properties make this safe:
+
+**1. A stable `code`, never the name.** `BAND10` is the identity; the display
+name may change freely. This is what reconnects a returning course to its own
+history — and the live data shows why it matters, with one course already
+carrying three different names across two years. Matching on name would silently
+create a *new* course and orphan everything before the gap.
+
+**2. `status` distinguishes dormant from retired.** Not teaching a course this
+year is `dormant` — it stays in the catalogue, out of the year's UI, ready to
+resume. `retired` means genuinely gone. Today both look identical (an empty
+`school_years` array), which is why four real courses currently sit in limbo.
+
+**3. Clone forward from the most recent offering, not last year's.** When
+resuming, prior materials should come from whenever the course last ran:
+
+```sql
+-- the offering to copy assignments from when reviving a course
+select * from course_offerings
+where course_id = $1 and school_year < $2
+order by school_year desc
+limit 1;
+```
+
+A "copy from previous year" implementation would silently find nothing after a
+gap and hand back an empty course.
+
+`superseded_by` covers the related but distinct case where a course does not
+pause but *changes shape* — "Worship Leadership 11/12" becoming "WL 11" and
+"WL 12". The lineage pointer keeps the old offerings reachable without
+pretending the new courses are the same one.
+
+### What this makes easy
+
+- *"Every year I have taught this course"* — offerings by `course_id`.
+- *"What did I do last time I taught this?"* — most recent prior offering.
+- *"Which courses could I revive?"* — `status = 'dormant'`.
+- Year selector lists only years with offerings, so a gap year never shows an
+  empty course that was not actually running.
+
+---
+
+## 4. Security model
 
 Current policies grant every authenticated user unrestricted access to all
 student data. Two changes:
@@ -145,7 +212,7 @@ becomes structurally immutable rather than immutable by convention.
 
 ---
 
-## 4. The yearly rollover
+## 5. The yearly rollover
 
 With this model, starting a new year is a routine operation rather than a
 schema edit:
@@ -161,7 +228,7 @@ Steps 2–4 are worth a `roll_over_year()` function once the shape settles.
 
 ---
 
-## 5. Migration path
+## 6. Migration path
 
 Ordered so that each step is independently safe and reversible.
 
