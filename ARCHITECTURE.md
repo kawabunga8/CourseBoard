@@ -17,7 +17,7 @@ Each of these is observed in the live database, not hypothetical.
 |---|---|---|---|
 | 1 | Year-specific facts stored on the course row | `rcs.courses.school_years` is an array with a single `block` column | A course in two years cannot hold two blocks. Patched with `course_blocks`; the same patch will be needed for room, teacher, section… |
 | 2 | Quarters have no school year | `public.school_quarters` = 4 rows, ids 1–4, dates hard-coded to 2025-26 | Next year overwrites this year's dates. Quarter history is lost permanently |
-| 3 | Student identity is year-scoped | `public.students.school_year` | A returning student becomes a second row. No way to follow a student across years |
+| 3 | ~~Student identity is year-scoped~~ **Resolved** | `enrollments.grade_year` added; 2026-27 imported by matching returning students to their existing row | 76 students now hold enrollments in both years under one identity. `students.school_year` is vestigial and can be dropped |
 | 4 | ~~Two competing course tables~~ **Resolved** | Student Hub (`public.courses`) is now the source of truth for all course data; `rcs.course_hub_links` maps it to enrollments | — |
 | 5 | Two competing student tables | `public.students` (145) and `rcs.students` (5) | Querying the wrong one silently returns almost nothing. `rcs.students` is test data — numbers 10001–10004 plus 999999, created Mar 2026; 3 of 5 duplicate a real `public.students` person under a different UUID |
 | 6 | Missing referential integrity | No FK on `rcs.enrollments.student_id` | The 1 orphaned enrollment was a test-data row (removed); nothing prevents more without the FK |
@@ -111,6 +111,13 @@ is one row forever. Their grade level is a property of a given year's
 enrollment, not of the person. This is what makes "show me this student across
 four years" possible — and it is much harder to retrofit later, once duplicate
 rows exist.
+
+> **Done.** `enrollments.grade_year` exists and is populated for both years. The
+> 2026-27 import (266 enrollments, 218 students) matched 76 returning students
+> to their existing rows rather than creating duplicates. Every one of those 76
+> advanced exactly one grade — 9→10 (31), 10→11 (23), 11→12 (22) — which is also
+> the check that confirms the name matching did not cross two people.
+> `students.school_year` is now vestigial.
 
 **Assignments attach to `offering_id`.** Today they attach to `course_id`, so an
 assignment cannot be attributed to a year when the course spans two.
