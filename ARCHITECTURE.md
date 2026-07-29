@@ -229,7 +229,125 @@ as zeros rather than excluded.
 
 ---
 
-## 5. Security model
+## 5. Keeping Student Hub the single source
+
+Several apps share this database. Course data currently exists in **three**
+places, and they disagree:
+
+| Table | Rows | Created | Read by |
+|---|---|---|---|
+| `public.classes` | 35 | Feb–Jun 2026 | Day plans, TOC, group maker, kawahoot, `public.enrollments` |
+| `public.courses` | 32 | 27 Jun 2026 | CourseBoard, group maker (`source_course_id`) |
+| `rcs.courses` | 25 | — | Report card tool; CourseBoard via `course_hub_links` |
+
+`public.courses` is the newest and richest, and Student Hub is **already
+mid-migration** from `classes` to `courses`: of 464 rows in
+`public.enrollments`, 283 carry a `course_id` and 181 do not.
+
+### The drift is live, not theoretical
+
+`public.classes` still contains the `Computer Studies 10 Q1/Q2` row for
+2025-26 that was deleted from `public.courses` — a course that never ran.
+The two tables disagreed within minutes of the correction.
+
+They also disagree structurally. `classes` collapses what `courses` splits:
+
+| `public.classes` | `public.courses` |
+|---|---|
+| `Band 10-12` (one row) | `Band 10`, `Band 11`, `Band 12` |
+| `Computer Programming 11/12` | `CP 11`, `CP 12` |
+| `Worship Leadership 11/12` | `WL 11`, `WL 12` |
+| `Career Class 10`, block `CL` | `Career Life Education 10`, block `CLE` |
+
+This is why four `rcs.courses` rows looked like orphans: they were seeded from
+`classes` naming, not `courses` naming.
+
+### 181 enrollments are currently unattributable
+
+Every unmigrated enrollment points at a `classes` row with a **null
+school_year**, so it belongs to no year at all:
+
+| Class | Students stranded |
+|---|---|
+| Concert Band 9 | 36 |
+| Senior Concert Band | 28 |
+| Computer Studies 10 | 26 |
+| Worship Leadership 11/12 | 22 |
+| Career Life Education 10 | 20 |
+| Biblical Perspectives 10 (C) | 18 |
+| Computer Programming 11/12 | 16 |
+| Biblical Perspectives 10 (D) | 15 |
+
+These are real rosters. They are invisible to any app that filters by year.
+
+Note the collapsed rows can still be split mechanically: `public.students`
+carries `grade_year`, so a `Senior Concert Band` enrollment resolves to
+`Band 10`/`11`/`12` by the student's own grade.
+
+### Consumer audit
+
+Every repo sharing this database, by table actually queried:
+
+| App | `courses` | `classes` | Notes |
+|---|---|---|---|
+| rcs-report-card-tool | 13 files | 0 | Already fully on `courses` |
+| student-hub | 3 calls | **1 call** | `src/app/students/StudentsClient.tsx:141` |
+| CourseBoard | 4 files | 0 | Reference implementation |
+| group-maker | 3 | 0 | Owns `group_maker_classes`; links via `source_course_id` |
+| KawaHoot | 1 | 0 | Owns `kawahoot_classes`; independent |
+| toc-dayplans | 0 | 0 | No direct table calls in `src` |
+
+**`public.classes` has exactly one application call site.** Everything else
+referencing it does so through foreign keys: `enrollments.class_id` (444),
+`day_plan_blocks.class_id` (138), `toc_block_plans.class_id` (125),
+`class_toc_templates.class_id` (14).
+
+### Canonical table: `public.courses`
+
+Newest, richest, and already used by five of six apps. `rcs.courses` is
+superseded by `course_hub_links`; `public.classes` is superseded outright —
+with one caveat below.
+
+### The caveat: `classes` and `courses` are not the same granularity
+
+They are not pure duplicates. `classes` models the **combined teaching block** —
+what actually happens in one room at one time — while `courses` models the
+**reporting unit** used for report cards:
+
+| `public.classes` (taught together) | `public.courses` (reported separately) |
+|---|---|
+| `Band 10-12` | `Band 10`, `Band 11`, `Band 12` |
+| `Computer Programming 11/12` | `CP 11`, `CP 12` |
+| `Worship Leadership 11/12` | `WL 11`, `WL 12` |
+
+Enrolment counts corroborate this: `Senior Concert Band` carries 28 students in
+`public.enrollments`, against 30 across `Band 10`+`11`+`12` in `rcs` — the same
+cohort, grouped two ways.
+
+**Deleting `classes` outright would lose that grouping**, which 138 day-plan
+blocks and 125 TOC plans depend on. A day plan for block B is about one combined
+class, not three.
+
+The fix is to express the grouping *inside* the canonical table rather than in a
+second one — a `teaching_group_id` on `courses`, self-referencing or pointing at
+a small `teaching_groups` table. Day plans then reference a group, report cards
+reference individual courses, and there is still exactly one source of truth.
+
+### Decommissioning sequence
+
+| Step | Action | Blocked on |
+|---|---|---|
+| 1 | Add `teaching_group_id` to `courses`; create groups for Band, CP, WL | — |
+| 2 | Repoint `student-hub/StudentsClient.tsx:141` to `courses` | Write access to student-hub |
+| 3 | Migrate 181 unmigrated `enrollments.class_id` → `course_id` | Step 1 (needs the grouping) |
+| 4 | Repoint `day_plan_blocks`, `toc_block_plans`, `class_toc_templates` to groups | Steps 1–3 |
+| 5 | Drop `day_plan_blocks.class_name` (denormalised copy of the name) | Step 4 |
+| 6 | Drop `public.classes` | Steps 2–5 |
+| 7 | Add FKs from every course reference to `public.courses` | Step 6 |
+
+---
+
+## 6. Security model
 
 Current policies grant every authenticated user unrestricted access to all
 student data. Two changes:
