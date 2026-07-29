@@ -18,7 +18,7 @@ Each of these is observed in the live database, not hypothetical.
 | 1 | Year-specific facts stored on the course row | `rcs.courses.school_years` is an array with a single `block` column | A course in two years cannot hold two blocks. Patched with `course_blocks`; the same patch will be needed for room, teacher, section… |
 | 2 | Quarters have no school year | `public.school_quarters` = 4 rows, ids 1–4, dates hard-coded to 2025-26 | Next year overwrites this year's dates. Quarter history is lost permanently |
 | 3 | Student identity is year-scoped | `public.students.school_year` | A returning student becomes a second row. No way to follow a student across years |
-| 4 | Two competing course tables | `public.courses` (33) and `rcs.courses` (25), `public_course_id` NULL on all 25 | Two sources of truth that already disagree (2025-26 ICT 9 / Computer Studies 10) |
+| 4 | ~~Two competing course tables~~ **Resolved** | Student Hub (`public.courses`) is now the source of truth for all course data; `rcs.course_hub_links` maps it to enrollments | — |
 | 5 | Two competing student tables | `public.students` (145) and `rcs.students` (5) | Enrollments resolve 185/186 to `public.students`. Querying the wrong one silently returns almost nothing |
 | 6 | Missing referential integrity | No FK on `rcs.enrollments.student_id` | 1 of 186 enrollments already points at a non-existent student. Nothing prevents more |
 | 7 | Flat authorisation | Every `rcs.*` policy is `ALL` to `authenticated` using `true` | Any signed-in account reads every student in every year. No per-teacher scoping, no read-only past |
@@ -29,6 +29,13 @@ Each of these is observed in the live database, not hypothetical.
 ---
 
 ## 2. Target model
+
+> **Source of truth: Student Hub.** All course data is read from and stored in
+> `public.courses`. It already holds one row per course per school year with
+> that year's block, room, quarters and sort order — i.e. it is already the
+> `COURSE_OFFERINGS` table below, and `rcs.course_blocks` is superseded by it.
+> What it still lacks is a catalogue table giving a course a stable identity
+> *across* years; see §3.
 
 The organising idea: **separate the timeless thing from its yearly instance.**
 
