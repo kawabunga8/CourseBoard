@@ -337,7 +337,7 @@ reference individual courses, and there is still exactly one source of truth.
 
 | Step | Action | Blocked on |
 |---|---|---|
-| 1 | Add `teaching_group_id` to `courses`; create groups for Band, CP, WL | — |
+| 1 | ~~Add `teaching_group_id` to `courses`; create groups~~ **Done** — 21 groups, all 29 courses assigned | — |
 | 2 | Repoint `student-hub/StudentsClient.tsx:141` to `courses` | Write access to student-hub |
 | 3 | Migrate 181 unmigrated `enrollments.class_id` → `course_id` | Step 1 (needs the grouping) |
 | 4 | Repoint `day_plan_blocks`, `toc_block_plans`, `class_toc_templates` to groups | Steps 1–3 |
