@@ -345,6 +345,26 @@ second one — a `teaching_group_id` on `courses`, self-referencing or pointing 
 a small `teaching_groups` table. Day plans then reference a group, report cards
 reference individual courses, and there is still exactly one source of truth.
 
+### Removed: the rcs → public enrollment trigger
+
+`sync_rcs_enrollment` on `rcs.enrollments` has been dropped. It was broken in a
+way that blocked writes rather than corrupting them: it used
+`ON CONFLICT (class_id, student_id)` while `public.enrollments` has no unique
+constraint on those columns, so every insert failed with SQLSTATE `42P10` and
+rolled back — the report card tool could not save an enrollment at all.
+
+Repairing that error alone would have been worse than leaving it. The function
+resolved its targets **by block**, so one rcs enrollment would write into every
+class sharing that block — three for block H, the same mechanism that produced
+the fabricated 36/36/36 rosters already removed. Adding the missing unique
+constraint would have converted a visible failure into silent duplication.
+
+It also synced the wrong direction, making `rcs` authoritative over Student Hub,
+and derived the school year from `NOW()` rather than from the row, so its
+behaviour changed silently each September.
+
+Any replacement must key on **course**, not block, and run public → rcs.
+
 ### Decommissioning sequence
 
 | Step | Action | Blocked on |
