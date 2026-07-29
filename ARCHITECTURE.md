@@ -188,10 +188,21 @@ An empty roster has two very different meanings:
   absence says nothing about what happened.
 
 Today these are indistinguishable, and the archive silently asserts the first
-when the second is true. A live example: CourseBoard was not operational during
-Q1 and Q2 of 2025-26, so `ICT 9 Q1`, `ICT 9 Q2` and `Computer Studies 10 Q1/Q2`
-have no enrollment records. Those courses ran and had students. The database
-currently claims they had none.
+when the second is true. The live example: the app was implemented partway
+through 2025-26, from Q3. `ICT 9 Q1` and `ICT 9 Q2` ran in Q1 and Q2 with real
+students, but no roster was ever captured; both now show zero. `Concert Band 9`
+(Q3/Q4) has its genuine roster of 36 because it falls after adoption.
+
+The zero on those two ICT sections is therefore **correct as a record** and
+**wrong as a fact** — precisely the distinction this section exists to preserve.
+
+A worse variant was already present and has been removed: a bulk import had
+assigned all 36 grade-9 students to every block H course, so both ICT sections
+falsely reported full rosters. The importer split by grade year, which works
+wherever grades differ — blocks A, B and F show zero overlap between their
+courses — but block H's three courses are all grade 9, so it could not
+distinguish them and assigned everyone to all three. Fabricated records are
+more damaging than absent ones: they survive scrutiny.
 
 Over a career this compounds: each gap — a term before adoption, a leave, a
 migration — becomes indistinguishable from a genuine zero, and the ability to
@@ -206,9 +217,10 @@ alter table school_years
   add column records_note text;          -- "adopted mid-year, from Q3"
 ```
 
-For 2025-26 that is the start of Q3 (2026-01-19). Any course whose teaching
-period falls entirely before `records_from` is *outside coverage*, and the UI
-must say so rather than showing a zero:
+For 2025-26 that is the start of Q3, **2026-01-19** — confirmed: the app was
+implemented at Q3. Any course whose teaching period falls entirely before
+`records_from` is *outside coverage*, and the UI must say so rather than
+showing a zero:
 
 > **No records for this course.** CourseBoard was not in use during Q1–Q2 of
 > 2025-26. This course ran in Q1; its roster predates the system.
