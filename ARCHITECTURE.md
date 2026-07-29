@@ -179,7 +179,57 @@ pretending the new courses are the same one.
 
 ---
 
-## 4. Security model
+## 4. Data coverage: absence of records vs absence of students
+
+An empty roster has two very different meanings:
+
+- **No students enrolled** — a real, factual zero.
+- **No records kept** — the system was not in use for that period, so the
+  absence says nothing about what happened.
+
+Today these are indistinguishable, and the archive silently asserts the first
+when the second is true. A live example: CourseBoard was not operational during
+Q1 and Q2 of 2025-26, so `ICT 9 Q1`, `ICT 9 Q2` and `Computer Studies 10 Q1/Q2`
+have no enrollment records. Those courses ran and had students. The database
+currently claims they had none.
+
+Over a career this compounds: each gap — a term before adoption, a leave, a
+migration — becomes indistinguishable from a genuine zero, and the ability to
+tell them apart lives only in memory.
+
+**Record the coverage window as data.** The `school_years` table gains the
+period from which records are known complete:
+
+```sql
+alter table school_years
+  add column records_from date,          -- null = no records kept this year
+  add column records_note text;          -- "adopted mid-year, from Q3"
+```
+
+For 2025-26 that is the start of Q3 (2026-01-19). Any course whose teaching
+period falls entirely before `records_from` is *outside coverage*, and the UI
+must say so rather than showing a zero:
+
+> **No records for this course.** CourseBoard was not in use during Q1–Q2 of
+> 2025-26. This course ran in Q1; its roster predates the system.
+
+Because Student Hub already stores `quarters` per course and `school_quarters`
+holds the dates, this is derivable — no per-course flagging needed.
+
+### Why this belongs in the schema
+
+The distinction cannot be reconstructed later. A future reader — including you
+in 2032 — sees only an empty list, and nothing in the data indicates whether to
+trust it. Recording coverage once, at the point the gap is known, is the only
+moment the information is cheaply available.
+
+It also protects any statistic computed across years. Enrolment totals, "students
+taught", and per-course histories are all wrong if uncovered periods are counted
+as zeros rather than excluded.
+
+---
+
+## 5. Security model
 
 Current policies grant every authenticated user unrestricted access to all
 student data. Two changes:
@@ -219,7 +269,7 @@ becomes structurally immutable rather than immutable by convention.
 
 ---
 
-## 5. The yearly rollover
+## 6. The yearly rollover
 
 With this model, starting a new year is a routine operation rather than a
 schema edit:
@@ -235,7 +285,7 @@ Steps 2–4 are worth a `roll_over_year()` function once the shape settles.
 
 ---
 
-## 6. Migration path
+## 7. Migration path
 
 Ordered so that each step is independently safe and reversible.
 
