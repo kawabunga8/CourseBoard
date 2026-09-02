@@ -45,7 +45,7 @@ Currently uses mock data. In production:
 
 Ready to integrate with:
 - **rcs-report-card-tool** API (course + student data)
-- **student-hub** (authentication + enrollment)
+- **course-hub** (authentication + enrollment)
 - Supabase (database)
 
 ## Deployment
@@ -58,7 +58,7 @@ npm run build && vercel
 
 Environment variables (optional):
 - `VITE_REPORT_CARD_API` - API endpoint for course data
-- `VITE_STUDENT_HUB_API` - API endpoint for enrollment data
+- `VITE_COURSE_HUB_API` - API endpoint for enrollment data
 
 ## Future Enhancements
 

@@ -9,7 +9,7 @@ export interface CourseAssignment {
   is_published: boolean;
 }
 
-/** Takes a Student Hub course id; assignments still live against rcs.courses. */
+/** Takes a Course Hub course id; assignments still live against rcs.courses. */
 export async function getCourseAssignments(hubCourseId: string): Promise<CourseAssignment[]> {
   const link = await resolveRcsCourseId(hubCourseId);
   if (!link) return [];

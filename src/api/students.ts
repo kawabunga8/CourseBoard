@@ -7,8 +7,8 @@ export interface CourseStudent {
 }
 
 /**
- * Rosters come from Student Hub: public.enrollments keyed directly by the
- * Student Hub course id, with student rows in public.students.
+ * Rosters come from Course Hub: public.enrollments keyed directly by the
+ * Course Hub course id, with student rows in public.students.
  *
  * This deliberately does not go through rcs.enrollments. That table is the
  * report card tool's own copy and is missing courses entirely — ICT 9 Q1 and

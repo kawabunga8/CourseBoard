@@ -20,7 +20,7 @@ export default function Login() {
     <div className="login-screen">
       <form className="login-card" onSubmit={handleSubmit}>
         <h1>📚 Course Dashboard</h1>
-        <p className="login-hint">Sign in with your Student Hub account.</p>
+        <p className="login-hint">Sign in with your Course Hub account.</p>
 
         <label htmlFor="email">Email</label>
         <input

@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Course data comes from Student Hub (public.courses), which is the source of
+ * Course data comes from Course Hub (public.courses), which is the source of
  * truth. It holds one row per course per school year, so the block, room and
  * quarters already vary by year without any side table.
  */
@@ -54,7 +54,7 @@ export async function fetchCourses(schoolYear: string): Promise<Course[]> {
 }
 
 /**
- * Enrollments still hang off rcs.courses, so a Student Hub course has to be
+ * Enrollments still hang off rcs.courses, so a Course Hub course has to be
  * translated before student data can be looked up. Returns null when the
  * course has no linked rcs row — meaning no enrollment data exists for it.
  */
